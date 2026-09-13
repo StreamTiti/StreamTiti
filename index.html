@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>streamTiti</title>
+<meta name="theme-color" content="#0B0E14">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap');
+
+  :root{
+    --bg: #0B0E14;
+    --panel: #141824;
+    --panel-hi: #1B2030;
+    --line: #262C3D;
+    --text: #EDEFF3;
+    --muted: #7C8494;
+    --accent: #E8A33D;
+    --accent-dim: #6b551f;
+    --error: #E15554;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter', system-ui, sans-serif;
+    overflow:hidden;
+  }
+  h1,h2,h3,.display{ font-family:'Space Grotesk', sans-serif; }
+
+  #app{ display:flex; flex-direction:column; height:100dvh; }
+
+  header{
+    display:flex; align-items:center; gap:14px;
+    padding: 16px 18px 12px;
+    border-bottom:1px solid var(--line);
+    flex-shrink:0;
+  }
+  .wordmark{
+    font-size:19px; font-weight:700; letter-spacing:-0.01em;
+    display:flex; align-items:center; gap:8px;
+  }
+  .wordmark .dot{ width:9px; height:9px; border-radius:50%; background:var(--accent); flex-shrink:0; }
+  header .sub{ font-size:12px; color:var(--muted); margin-left:auto; }
+
+  #search-bar{
+    padding: 12px 18px; flex-shrink:0;
+    display:flex; gap:8px;
+  }
+  #search-bar input{
+    flex:1; background:var(--panel); border:1px solid var(--line);
+    color:var(--text); padding:11px 14px; border-radius:9px;
+    font-size:15px; font-family:inherit;
+  }
+  #search-bar input:focus{ outline:none; border-color:var(--accent); }
+  #search-bar button{
+    background:var(--panel); border:1px solid var(--line); color:var(--muted);
+    border-radius:9px; padding:0 14px; font-size:18px; cursor:pointer;
+  }
+
+  .groups{
+    display:flex; gap:8px; padding: 0 18px 12px; overflow-x:auto;
+    flex-shrink:0; scrollbar-width:none;
+  }
+  .groups::-webkit-scrollbar{ display:none; }
+  .chip{
+    flex-shrink:0; padding:7px 14px; border-radius:100px;
+    background:var(--panel); border:1px solid var(--line);
+    font-size:13px; color:var(--muted); cursor:pointer; white-space:nowrap;
+  }
+  .chip.active{ background:var(--accent); border-color:var(--accent); color:#1a1305; font-weight:600; }
+
+  main{ flex:1; overflow-y:auto; padding: 4px 18px 90px; }
+
+  #tabbar{
+    position:fixed; left:0; right:0; bottom:0; height:64px; z-index:15;
+    background:var(--panel); border-top:1px solid var(--line);
+    display:flex; padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+  #tabbar button{
+    flex:1; background:none; border:none; color:var(--muted); font-family:inherit;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
+    font-size:11px; cursor:pointer; padding:6px 0;
+  }
+  #tabbar button .ticon{ font-size:19px; line-height:1; }
+  #tabbar button.active{ color:var(--accent); }
+
+  #fab{ display:flex; align-items:center; justify-content:center; }
+
+  .rec-list{ display:flex; flex-direction:column; gap:10px; }
+  .rec-item{
+    background:var(--panel); border:1px solid var(--line); border-radius:12px;
+    padding:14px; display:flex; align-items:center; gap:12px;
+  }
+  .rec-item .ricon{ font-size:20px; flex-shrink:0; }
+  .rec-item .rinfo{ flex:1; min-width:0; }
+  .rec-item .rname{ font-size:14px; font-weight:600; margin-bottom:2px;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .rec-item .rmeta{ font-size:12px; color:var(--muted); }
+  .rec-item .ractions{ display:flex; gap:8px; flex-shrink:0; }
+  .rec-item .ractions button{
+    background:var(--panel-hi); border:1px solid var(--line); color:var(--text);
+    width:34px; height:34px; border-radius:50%; font-size:14px; cursor:pointer;
+  }
+
+  .badge-flag{ position:absolute; top:6px; left:6px; font-size:14px; background:rgba(0,0,0,0.55);
+    border-radius:6px; padding:2px 5px; line-height:1; }
+
+  #empty-state{
+    height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    text-align:center; padding: 20px; gap:14px; color:var(--muted);
+  }
+  #empty-state .display{ font-size:22px; color:var(--text); }
+  #empty-state p{ max-width:280px; font-size:14px; line-height:1.5; margin:0; }
+
+  .folder-grid{
+    display:grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap:12px;
+  }
+  .folder-tile{
+    background:var(--panel); border:1px solid var(--line); border-radius:12px;
+    cursor:pointer; padding:18px 16px; display:flex; flex-direction:column; gap:10px;
+    transition: border-color .15s ease, transform .1s ease;
+  }
+  .folder-tile:active{ transform: scale(0.97); }
+  .folder-tile .flag{ font-size:28px; line-height:1; }
+  .folder-tile .flabel{ font-size:15px; font-weight:600; }
+  .folder-tile .fcount{ font-size:12px; color:var(--muted); }
+
+  .back-chip{
+    flex-shrink:0; padding:7px 14px; border-radius:100px;
+    background:var(--panel); border:1px solid var(--line);
+    font-size:13px; color:var(--text); cursor:pointer; white-space:nowrap;
+    display:flex; align-items:center; gap:6px;
+  }
+
+  .grid{
+    display:grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap:12px;
+  }
+  .tile{
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    cursor:pointer; overflow:hidden; display:flex; flex-direction:column;
+    transition: border-color .15s ease, transform .1s ease;
+  }
+  .tile:active{ transform: scale(0.97); }
+  .tile.playing{ border-color:var(--accent); }
+  .tile-art{
+    aspect-ratio: 16/10; background:var(--panel-hi); display:flex; align-items:center; justify-content:center;
+    position:relative;
+  }
+  .tile-art img{ width:100%; height:100%; object-fit:contain; padding:10px; }
+  .tile-art .fallback{ font-size:26px; font-weight:700; color:var(--muted); font-family:'Space Grotesk',sans-serif; }
+  .tile-name{ padding:9px 10px 11px; font-size:13px; font-weight:500; line-height:1.3;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+
+  /* Bottom sheet: add source */
+  #fab{
+    position:fixed; right:18px; bottom:82px; width:56px; height:56px; border-radius:50%;
+    background:var(--accent); color:#1a1305; border:none; font-size:26px; font-weight:700;
+    box-shadow: 0 8px 24px rgba(232,163,61,0.35); cursor:pointer; z-index:20;
+  }
+  #sheet-backdrop{
+    position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:30;
+    display:none; align-items:flex-end; justify-content:center;
+  }
+  #sheet-backdrop.open{ display:flex; }
+  #sheet{
+    background:var(--panel); width:100%; max-width:520px; border-radius:18px 18px 0 0;
+    padding: 10px 20px 28px; border-top:1px solid var(--line);
+  }
+  #sheet .handle{ width:36px; height:4px; background:var(--line); border-radius:2px; margin: 6px auto 18px; }
+  #sheet h2{ font-size:18px; margin:0 0 14px; }
+  #sheet label{ font-size:12px; color:var(--muted); display:block; margin: 14px 0 6px; }
+  #sheet input[type=text], #sheet input[type=url]{
+    width:100%; background:var(--panel-hi); border:1px solid var(--line); color:var(--text);
+    padding:11px 13px; border-radius:9px; font-size:14px; font-family:inherit;
+  }
+  .file-btn{
+    display:block; width:100%; text-align:center; background:var(--panel-hi); border:1px dashed var(--line);
+    color:var(--muted); padding:16px; border-radius:9px; font-size:13px; cursor:pointer; margin-top:6px;
+  }
+  .row-btns{ display:flex; gap:10px; margin-top:20px; }
+  .btn{
+    flex:1; padding:12px; border-radius:9px; border:none; font-size:14px; font-weight:600;
+    font-family:inherit; cursor:pointer;
+  }
+  .btn.primary{ background:var(--accent); color:#1a1305; }
+  .btn.ghost{ background:transparent; color:var(--muted); border:1px solid var(--line); }
+  #sheet .saved-list{ margin-top:18px; border-top:1px solid var(--line); padding-top:14px; }
+  .saved-item{
+    display:flex; align-items:center; gap:10px; padding:8px 0; font-size:13px;
+  }
+  .saved-item .name{ flex:1; }
+  .saved-item .del{ color:var(--muted); background:none; border:none; font-size:16px; cursor:pointer; }
+  .preset-list{ display:flex; flex-direction:column; gap:8px; margin-top:6px; }
+  .preset-item{
+    display:flex; align-items:center; gap:10px; background:var(--panel-hi); border:1px solid var(--line);
+    border-radius:9px; padding:11px 13px;
+  }
+  .preset-item .pinfo{ flex:1; min-width:0; }
+  .preset-item .pname{ font-size:13px; font-weight:600; }
+  .preset-item .pdesc{ font-size:11.5px; color:var(--muted); margin-top:1px; }
+  .preset-item button{
+    background:var(--accent); color:#1a1305; border:none; border-radius:7px; padding:7px 12px;
+    font-size:12px; font-weight:700; cursor:pointer; flex-shrink:0; font-family:inherit;
+  }
+  .preset-item button:disabled{ background:var(--line); color:var(--muted); cursor:default; }
+
+  /* Player overlay */
+  #player-overlay{
+    position:fixed; inset:0; background:#000; z-index:50; display:none;
+    flex-direction:column;
+  }
+  #player-overlay.open{ display:flex; }
+  #player-overlay video{ flex:1; width:100%; height:100%; object-fit:contain; background:#000; }
+  #player-top{
+    position:absolute; top:0; left:0; right:0; padding: 16px 16px 40px;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.75), transparent);
+    display:flex; align-items:center; gap:12px; z-index:2;
+  }
+  #player-top .close{
+    background:rgba(255,255,255,0.12); border:none; color:#fff; width:38px; height:38px;
+    border-radius:50%; font-size:18px; cursor:pointer; flex-shrink:0;
+  }
+  #player-top .title{ font-size:15px; font-weight:600; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #player-top .cc-btn{
+    background:rgba(255,255,255,0.12); border:none; color:#fff; height:38px; padding:0 14px;
+    border-radius:19px; font-size:13px; font-weight:700; cursor:pointer; flex-shrink:0; letter-spacing:0.02em;
+  }
+  #player-top .cc-btn.active{ background:var(--accent); color:#1a1305; }
+  #player-top .rec-btn{
+    background:rgba(255,255,255,0.12); border:none; color:#fff; height:38px; padding:0 14px;
+    border-radius:19px; font-size:13px; font-weight:700; cursor:pointer; flex-shrink:0;
+    display:flex; align-items:center; gap:6px;
+  }
+  #player-top .rec-btn .dot{ width:9px; height:9px; border-radius:50%; background:var(--error); }
+  #player-top .rec-btn.recording{ background:var(--error); color:#fff; }
+  #player-top .rec-btn.recording .dot{ background:#fff; animation:blink 1s infinite; }
+  @keyframes blink{ 50%{ opacity:0.3; } }
+  #subs-menu{
+    position:absolute; top:64px; right:16px; z-index:3; background:var(--panel);
+    border:1px solid var(--line); border-radius:12px; padding:8px; width:230px;
+    display:none; flex-direction:column; gap:2px; max-height:60vh; overflow-y:auto;
+  }
+  #subs-menu.open{ display:flex; }
+  #subs-menu .sub-opt{
+    padding:10px 12px; border-radius:8px; font-size:13px; cursor:pointer; color:var(--text);
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+  }
+  #subs-menu .sub-opt:hover, #subs-menu .sub-opt.sel{ background:var(--panel-hi); }
+  #subs-menu .sub-opt.sel{ color:var(--accent); font-weight:600; }
+  #subs-menu .sub-opt .del{ color:var(--muted); background:none; border:none; font-size:14px; cursor:pointer; flex-shrink:0; }
+  #subs-menu .sub-divider{ height:1px; background:var(--line); margin:6px 2px; }
+  #subs-menu .sub-add{
+    padding:10px 12px; border-radius:8px; font-size:13px; cursor:pointer; color:var(--accent); font-weight:600;
+  }
+  #subs-menu .sub-empty{ padding:8px 12px; font-size:12px; color:var(--muted); }
+  #player-status{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    color:var(--muted); font-size:14px; pointer-events:none;
+  }
+  #player-status.err{ color:var(--error); flex-direction:column; gap:8px; text-align:center; padding:0 30px;}
+
+  ::selection{ background:var(--accent); color:#1a1305; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="wordmark"><span class="dot"></span> streamTiti</div>
+    <div class="sub" id="channel-count"></div>
+  </header>
+
+  <div id="search-bar" style="display:none;">
+    <input type="text" id="search-input" placeholder="Rechercher une chaîne…" oninput="renderGrid()">
+  </div>
+  <div class="groups" id="groups"></div>
+
+  <main>
+    <div id="view-channels">
+      <div id="empty-state">
+        <div class="display">Aucune source pour l'instant</div>
+        <p>Ajoute une playlist M3U (fichier ou lien) avec le bouton en bas à droite pour voir tes chaînes apparaître ici.</p>
+      </div>
+      <div class="folder-grid" id="folder-grid" style="display:none;"></div>
+      <div class="grid" id="grid" style="display:none;"></div>
+    </div>
+
+    <div id="view-search" style="display:none;">
+      <div id="search-bar-global" style="padding:0 0 14px;">
+        <input type="text" id="search-input-global" placeholder="Chercher un film, une série, une chaîne…" oninput="renderGlobalSearch()"
+          style="width:100%; background:var(--panel); border:1px solid var(--line); color:var(--text); padding:12px 14px; border-radius:9px; font-size:15px; font-family:inherit;">
+      </div>
+      <div id="global-empty" style="color:var(--muted); font-size:14px; padding:30px 0; text-align:center;">
+        Tape un nom pour chercher dans toutes tes chaînes, toutes langues confondues.
+      </div>
+      <div class="grid" id="global-grid" style="display:none;"></div>
+    </div>
+
+    <div id="view-recordings" style="display:none;">
+      <div id="rec-empty" style="color:var(--muted); font-size:14px; padding:30px 0; text-align:center;">
+        Aucun enregistrement pour l'instant. Lance un enregistrement depuis le lecteur (bouton ●REC).
+      </div>
+      <div class="rec-list" id="rec-list"></div>
+    </div>
+  </main>
+
+  <button id="fab" onclick="openSheet()">+</button>
+
+  <nav id="tabbar">
+    <button id="tab-channels" class="active" onclick="setTab('channels')"><span class="ticon">📺</span>Chaînes</button>
+    <button id="tab-search" onclick="setTab('search')"><span class="ticon">🔍</span>Rechercher</button>
+    <button id="tab-recordings" onclick="setTab('recordings')"><span class="ticon">⏺</span>Enregistrements</button>
+  </nav>
+
+  <div id="sheet-backdrop" onclick="if(event.target===this) closeSheet()">
+    <div id="sheet">
+      <div class="handle"></div>
+      <h2>Ajouter une playlist M3U</h2>
+
+      <label>Fichier local (.m3u / .m3u8 / .txt)</label>
+      <label class="file-btn" id="file-label">Choisir un fichier
+        <input type="file" id="file-input" accept=".m3u,.m3u8,.txt" style="display:none">
+      </label>
+
+      <label>ou lien direct vers une playlist</label>
+      <input type="url" id="url-input" placeholder="https://exemple.com/playlist.m3u">
+
+      <div class="row-btns">
+        <button class="btn ghost" onclick="closeSheet()">Annuler</button>
+        <button class="btn primary" onclick="loadFromUrl()">Charger le lien</button>
+      </div>
+
+      <label>Sources gratuites suggérées</label>
+      <div class="preset-list" id="preset-list"></div>
+
+      <div class="saved-list" id="saved-list"></div>
+    </div>
+  </div>
+
+  <div id="player-overlay">
+    <div id="player-top">
+      <button class="close" onclick="closePlayer()">✕</button>
+      <div class="title" id="player-title"></div>
+      <button class="rec-btn" id="rec-btn" onclick="toggleRecording()"><span class="dot"></span>REC</button>
+      <button class="cc-btn" id="cc-btn" onclick="toggleSubsMenu()">CC</button>
+    </div>
+    <div id="subs-menu"></div>
+    <video id="video" playsinline controls></video>
+    <div id="player-status"></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.15/hls.min.js"></script>
+<script>
+  let channels = [];      // {name, logo, group, lang, url, folder}
+  let activeGroup = 'Tout';
+  let currentFolder = null; // null = vue dossiers, sinon clé de LANG_FOLDERS
+  let currentTab = 'channels'; // channels | search | recordings
+  let hls = null;
+  let mediaRecorder = null;
+  let recChunks = [];
+  let currentChannel = null;
+
+  const $ = id => document.getElementById(id);
+
+  const LANG_FOLDERS = [
+    { key:'fr', label:'Français',            flag:'🇫🇷', keywords:['FR','FRANCE','FRANCAIS','FRANÇAIS','FRENCH'] },
+    { key:'it', label:'Italien',             flag:'🇮🇹', keywords:['IT','ITA','ITALIA','ITALIAN','ITALY','ITALIANO'] },
+    { key:'de', label:'Allemand',            flag:'🇩🇪', keywords:['DE','GER','GERMANY','DEUTSCH','GERMAN','ALLEMAGNE'] },
+    { key:'en', label:'Anglais / Américain', flag:'🇺🇸', keywords:['EN','US','USA','UK','GB','ENG','ENGLISH','AMERICAN','AMERICA','UNITED STATES','UNITED KINGDOM'] },
+    { key:'ar', label:'Arabe',               flag:'🇸🇦', keywords:['AR','ARABIC','ARABE','ARAB','MBC','KSA'] },
+  ];
+  const OTHER_FOLDER = { key:'other', label:'Autres', flag:'🌐' };
+
+  const PRESET_SOURCES = [
+    {
+      name: 'Free-TV (chaînes gratuites, monde entier)',
+      desc: '20k+ chaînes en clair officiellement gratuites : Pluto TV, Plex TV, Samsung TV Plus, YouTube live…',
+      url: 'https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8'
+    }
+  ];
+
+  function classifyFolder(c){
+    const hay = ` ${c.group||''} ${c.lang||''} ${c.name||''} `.toUpperCase();
+    for(const f of LANG_FOLDERS){
+      if(f.keywords.some(k => new RegExp('(^|[^A-Z])' + k + '($|[^A-Z])').test(hay))) return f.key;
+    }
+    return 'other';
+  }
+
+  // ---------- Persistence ----------
+  function getSources(){
+    try { return JSON.parse(localStorage.getItem('ts_sources')||'[]'); } catch(e){ return []; }
+  }
+  function saveSources(list){ localStorage.setItem('ts_sources', JSON.stringify(list)); }
+
+  function addSource(source){
+    const list = getSources();
+    list.push(source);
+    saveSources(list);
+    renderSavedList();
+  }
+  function removeSource(idx){
+    const list = getSources();
+    list.splice(idx,1);
+    saveSources(list);
+    renderSavedList();
+    rebuildChannelsFromSources();
+  }
+
+  // ---------- M3U parsing ----------
+  function parseM3U(text){
+    const lines = text.split(/\r?\n/);
+    const out = [];
+    let current = null;
+    for(const raw of lines){
+      const line = raw.trim();
+      if(line.startsWith('#EXTINF')){
+        const nameMatch = line.match(/,(.*)$/);
+        const logoMatch = line.match(/tvg-logo="([^"]*)"/i);
+        const groupMatch = line.match(/group-title="([^"]*)"/i);
+        const langMatch = line.match(/tvg-language="([^"]*)"/i);
+        current = {
+          name: nameMatch ? nameMatch[1].trim() : 'Sans nom',
+          logo: logoMatch ? logoMatch[1] : '',
+          group: groupMatch ? groupMatch[1] : 'Général',
+          lang: langMatch ? langMatch[1] : ''
+        };
+      } else if(line && !line.startsWith('#')){
+        if(current){
+          current.url = line;
+          out.push(current);
+          current = null;
+        }
+      }
+    }
+    return out;
+  }
+
+  async function rebuildChannelsFromSources(){
+    const sources = getSources();
+    let all = [];
+    for(const s of sources){
+      try{
+        let text;
+        if(s.type === 'inline'){ text = s.content; }
+        else { const r = await fetch(s.content); text = await r.text(); }
+        all = all.concat(parseM3U(text));
+      }catch(e){ console.error('Erreur chargement source', s.name, e); }
+    }
+    channels = all;
+    channels.forEach(c => { c.folder = classifyFolder(c); });
+    renderFolders();
+    renderGroups();
+    renderGrid();
+  }
+
+  // ---------- Sheet ----------
+  function openSheet(){ $('sheet-backdrop').classList.add('open'); renderSavedList(); renderPresetList(); }
+  function closeSheet(){ $('sheet-backdrop').classList.remove('open'); }
+
+  function renderPresetList(){
+    const sources = getSources();
+    $('preset-list').innerHTML = PRESET_SOURCES.map(p => {
+      const already = sources.some(s => s.content === p.url);
+      return `<div class="preset-item">
+        <div class="pinfo">
+          <div class="pname">${escapeHtml(p.name)}</div>
+          <div class="pdesc">${escapeHtml(p.desc)}</div>
+        </div>
+        <button ${already?'disabled':''} onclick="addPreset('${p.url.replace(/'/g,"\\'")}','${p.name.replace(/'/g,"\\'")}')">${already?'Ajoutée':'Ajouter'}</button>
+      </div>`;
+    }).join('');
+  }
+
+  async function addPreset(url, name){
+    addSource({ name, type: 'url', content: url });
+    await rebuildChannelsFromSources();
+    renderPresetList();
+  }
+
+  function renderSavedList(){
+    const list = getSources();
+    const el = $('saved-list');
+    if(list.length === 0){ el.innerHTML = ''; return; }
+    el.innerHTML = '<label>Playlists enregistrées</label>' + list.map((s,i) =>
+      `<div class="saved-item"><span class="name">${escapeHtml(s.name)}</span><button class="del" onclick="removeSource(${i})">✕</button></div>`
+    ).join('');
+  }
+
+  $('file-input').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const text = await file.text();
+    addSource({ name: file.name, type: 'inline', content: text });
+    await rebuildChannelsFromSources();
+    closeSheet();
+    e.target.value = '';
+  });
+
+  async function loadFromUrl(){
+    const url = $('url-input').value.trim();
+    if(!url) return;
+    addSource({ name: url, type: 'url', content: url });
+    $('url-input').value = '';
+    await rebuildChannelsFromSources();
+    closeSheet();
+  }
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  // ---------- Folders (langues) ----------
+  function renderFolders(){
+    const allFolders = [...LANG_FOLDERS, OTHER_FOLDER];
+    const el = $('folder-grid');
+    if(channels.length === 0){ el.style.display = 'none'; return; }
+
+    if(currentFolder === null){
+      $('empty-state').style.display = 'none';
+      el.style.display = 'grid';
+      $('grid').style.display = 'none';
+      $('search-bar').style.display = 'none';
+      $('channel-count').textContent = `${channels.length} chaîne${channels.length>1?'s':''} au total`;
+
+      el.innerHTML = allFolders.map(f => {
+        const count = channels.filter(c => c.folder === f.key).length;
+        return `<div class="folder-tile" onclick="openFolder('${f.key}')">
+          <div class="flag">${f.flag}</div>
+          <div class="flabel">${escapeHtml(f.label)}</div>
+          <div class="fcount">${count} chaîne${count>1?'s':''}</div>
+        </div>`;
+      }).join('');
+    } else {
+      el.style.display = 'none';
+      $('search-bar').style.display = 'flex';
+    }
+  }
+
+  function openFolder(key){
+    currentFolder = key;
+    activeGroup = 'Tout';
+    $('search-input').value = '';
+    renderFolders();
+    renderGroups();
+    renderGrid();
+  }
+
+  function closeFolder(){
+    currentFolder = null;
+    activeGroup = 'Tout';
+    renderFolders();
+    renderGroups();
+    renderGrid();
+  }
+
+  // ---------- Grid / Groups ----------
+  function renderGroups(){
+    if(currentFolder === null){ $('groups').innerHTML = ''; return; }
+    const inFolder = channels.filter(c => c.folder === currentFolder);
+    const groups = ['Tout', ...new Set(inFolder.map(c => c.group || 'Général'))];
+    const folderMeta = [...LANG_FOLDERS, OTHER_FOLDER].find(f => f.key === currentFolder);
+    $('groups').innerHTML =
+      `<div class="back-chip" onclick="closeFolder()">‹ ${folderMeta.flag} ${escapeHtml(folderMeta.label)}</div>` +
+      groups.map(g =>
+        `<div class="chip ${g===activeGroup?'active':''}" onclick="setGroup('${escapeHtml(g).replace(/'/g,"\\'")}')">${escapeHtml(g)}</div>`
+      ).join('');
+  }
+  function setGroup(g){ activeGroup = g; renderGroups(); renderGrid(); }
+
+  function renderGrid(){
+    if(currentFolder === null){ $('grid').style.display = 'none'; return; }
+
+    const q = $('search-input').value.trim().toLowerCase();
+    let filtered = channels.filter(c => c.folder === currentFolder);
+    if(activeGroup !== 'Tout') filtered = filtered.filter(c => (c.group||'Général') === activeGroup);
+    if(q) filtered = filtered.filter(c => c.name.toLowerCase().includes(q));
+
+    $('channel-count').textContent = `${filtered.length} chaîne${filtered.length>1?'s':''}`;
+    $('empty-state').style.display = 'none';
+    $('grid').style.display = 'grid';
+
+    $('grid').innerHTML = filtered.map((c, i) => `
+      <div class="tile" onclick="playChannel(${channels.indexOf(c)})">
+        <div class="tile-art">
+          ${c.logo ? `<img src="${escapeHtml(c.logo)}" loading="lazy" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">` : ''}
+          <div class="fallback" style="${c.logo?'display:none;':''}">${escapeHtml(c.name.slice(0,2).toUpperCase())}</div>
+        </div>
+        <div class="tile-name">${escapeHtml(c.name)}</div>
+      </div>
+    `).join('');
+  }
+
+  // ---------- Player ----------
+  function playChannel(idx){
+    const c = channels[idx];
+    if(!c) return;
+    currentChannel = c;
+    stopRecordingIfActive(true);
+    $('player-title').textContent = c.name;
+    $('player-overlay').classList.add('open');
+    const video = $('video');
+    const status = $('player-status');
+    status.className = ''; status.textContent = 'Chargement…';
+    closeSubsMenu();
+    clearCustomTracks(video);
+
+    if(hls){ hls.destroy(); hls = null; }
+
+    const isHls = c.url.includes('.m3u8') || c.url.includes('.m3u');
+
+    if(isHls && window.Hls && Hls.isSupported()){
+      hls = new Hls();
+      hls.loadSource(c.url);
+      hls.attachMedia(video);
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        status.textContent=''; video.play(); attachCustomSubs(video, c.url); renderSubsMenu(c);
+      });
+      hls.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, () => renderSubsMenu(c));
+      hls.on(Hls.Events.ERROR, (evt, data) => {
+        if(data.fatal){ status.className='err'; status.textContent = "Impossible de lire ce flux. Vérifie le lien ou ta connexion."; }
+      });
+    } else if(video.canPlayType('application/vnd.apple.mpegurl') || !isHls){
+      video.src = c.url;
+      video.play().then(()=> { status.textContent=''; attachCustomSubs(video, c.url); renderSubsMenu(c); }).catch(()=>{
+        status.className='err'; status.textContent = "Impossible de lire ce flux. Vérifie le lien ou ta connexion.";
+      });
+    } else {
+      status.className='err'; status.textContent = "Format de flux non supporté sur cet appareil.";
+    }
+  }
+
+  function closePlayer(){
+    const video = $('video');
+    stopRecordingIfActive(false);
+    video.pause(); video.removeAttribute('src'); video.load();
+    if(hls){ hls.destroy(); hls = null; }
+    closeSubsMenu();
+    currentChannel = null;
+    $('player-overlay').classList.remove('open');
+  }
+
+  // ---------- Sous-titres ----------
+  function getCustomSubs(url){
+    try{ const all = JSON.parse(localStorage.getItem('ts_custom_subs')||'{}'); return all[url]||[]; }catch(e){ return []; }
+  }
+  function saveCustomSub(url, sub){
+    const all = JSON.parse(localStorage.getItem('ts_custom_subs')||'{}');
+    all[url] = all[url] || [];
+    all[url].push(sub);
+    localStorage.setItem('ts_custom_subs', JSON.stringify(all));
+  }
+  function removeCustomSub(url, i){
+    const all = JSON.parse(localStorage.getItem('ts_custom_subs')||'{}');
+    if(all[url]) all[url].splice(i,1);
+    localStorage.setItem('ts_custom_subs', JSON.stringify(all));
+  }
+
+  function clearCustomTracks(video){
+    [...video.querySelectorAll('track')].forEach(t => t.remove());
+  }
+
+  function attachCustomSubs(video, url){
+    getCustomSubs(url).forEach(s => {
+      const t = document.createElement('track');
+      t.kind = 'subtitles'; t.label = s.label; t.srclang = s.lang || 'xx'; t.src = s.url;
+      video.appendChild(t);
+    });
+  }
+
+  function toggleSubsMenu(){
+    const menu = $('subs-menu');
+    if(menu.classList.contains('open')) closeSubsMenu();
+    else { renderSubsMenu(currentChannel); menu.classList.add('open'); }
+  }
+  function closeSubsMenu(){ $('subs-menu').classList.remove('open'); }
+
+  function renderSubsMenu(c){
+    if(!c){ $('cc-btn').classList.remove('active'); $('subs-menu').innerHTML = '<div class="sub-empty">Pas de sous-titres disponibles.</div>'; return; }
+    const video = $('video');
+    const embedded = (hls && hls.subtitleTracks) ? hls.subtitleTracks : [];
+    const custom = getCustomSubs(c.url);
+    const anyActive = (hls && hls.subtitleDisplay && hls.subtitleTrack !== -1) ||
+      [...video.textTracks].some(t => t.mode === 'showing');
+    $('cc-btn').classList.toggle('active', anyActive);
+
+    let html = `<div class="sub-opt ${!anyActive?'sel':''}" onclick="selectSubtitle('off')">Désactivés</div>`;
+
+    if(embedded.length){
+      html += `<div class="sub-divider"></div>`;
+      embedded.forEach((t,i) => {
+        const sel = hls.subtitleDisplay && hls.subtitleTrack === i;
+        html += `<div class="sub-opt ${sel?'sel':''}" onclick="selectSubtitle('embedded',${i})">${escapeHtml(t.name || t.lang || ('Piste '+(i+1)))}</div>`;
+      });
+    }
+
+    html += `<div class="sub-divider"></div>`;
+    if(custom.length){
+      custom.forEach((s,i) => {
+        const tt = [...video.textTracks][i];
+        const sel = tt && tt.mode === 'showing';
+        html += `<div class="sub-opt ${sel?'sel':''}">
+          <span onclick="selectSubtitle('custom',${i})" style="flex:1;">${escapeHtml(s.label)}</span>
+          <button class="del" onclick="event.stopPropagation(); deleteCustomSub('${escapeHtml(c.url).replace(/'/g,"\\'")}', ${i})">✕</button>
+        </div>`;
+      });
+    } else {
+      html += `<div class="sub-empty">Aucun sous-titre externe ajouté</div>`;
+    }
+    html += `<div class="sub-add" onclick="addCustomSubtitle('${escapeHtml(c.url).replace(/'/g,"\\'")}')">+ Ajouter un lien .vtt</div>`;
+
+    $('subs-menu').innerHTML = html;
+  }
+
+  function selectSubtitle(type, index){
+    const video = $('video');
+    // Désactive tout par défaut
+    if(hls) hls.subtitleDisplay = false;
+    [...video.textTracks].forEach(t => t.mode = 'disabled');
+
+    if(type === 'embedded' && hls){
+      hls.subtitleTrack = index;
+      hls.subtitleDisplay = true;
+    } else if(type === 'custom'){
+      const tt = video.textTracks[index];
+      if(tt) tt.mode = 'showing';
+    }
+    renderSubsMenu(currentChannel);
+  }
+
+  function addCustomSubtitle(url){
+    const label = prompt('Nom de la langue (ex: Français, English, Italiano)…');
+    if(!label) return;
+    const subUrl = prompt('Lien direct vers le fichier .vtt de sous-titres…');
+    if(!subUrl) return;
+    const langCode = prompt('Code langue (2 lettres, ex: fr, en, it) — optionnel', 'fr') || 'xx';
+    saveCustomSub(url, { label, url: subUrl, lang: langCode });
+    attachCustomSubs($('video'), url);
+    renderSubsMenu(currentChannel);
+  }
+
+  function deleteCustomSub(url, i){
+    removeCustomSub(url, i);
+    const video = $('video');
+    clearCustomTracks(video);
+    attachCustomSubs(video, url);
+    renderSubsMenu(currentChannel);
+  }
+
+  // ---------- Onglets ----------
+  function setTab(tab){
+    currentTab = tab;
+    ['channels','search','recordings'].forEach(t => {
+      $('view-'+t).style.display = (t===tab) ? 'block' : 'none';
+      $('tab-'+t).classList.toggle('active', t===tab);
+    });
+    $('search-bar').style.display = (tab==='channels' && currentFolder!==null) ? 'flex' : 'none';
+    $('groups').style.display = (tab==='channels') ? 'flex' : 'none';
+    $('fab').style.display = (tab==='recordings') ? 'none' : 'flex';
+    if(tab==='channels'){ renderFolders(); renderGroups(); renderGrid(); }
+    if(tab==='search'){ renderGlobalSearch(); }
+    if(tab==='recordings'){ renderRecordingsTab(); }
+  }
+
+  function renderGlobalSearch(){
+    const q = $('search-input-global').value.trim().toLowerCase();
+    const grid = $('global-grid');
+    if(!q){ grid.style.display='none'; $('global-empty').style.display='block'; grid.innerHTML=''; return; }
+
+    const allFolders = [...LANG_FOLDERS, OTHER_FOLDER];
+    const results = channels.filter(c => c.name.toLowerCase().includes(q) || (c.group||'').toLowerCase().includes(q));
+
+    $('global-empty').style.display = results.length ? 'none' : 'block';
+    if(!results.length){ $('global-empty').textContent = 'Aucun résultat pour "'+q+'".'; grid.style.display='none'; return; }
+    grid.style.display = 'grid';
+
+    grid.innerHTML = results.map(c => {
+      const idx = channels.indexOf(c);
+      const meta = allFolders.find(f => f.key === c.folder) || OTHER_FOLDER;
+      return `<div class="tile" onclick="playChannel(${idx})" style="position:relative;">
+        <div class="tile-art">
+          <span class="badge-flag">${meta.flag}</span>
+          ${c.logo ? `<img src="${escapeHtml(c.logo)}" loading="lazy" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">` : ''}
+          <div class="fallback" style="${c.logo?'display:none;':''}">${escapeHtml(c.name.slice(0,2).toUpperCase())}</div>
+        </div>
+        <div class="tile-name">${escapeHtml(c.name)}</div>
+      </div>`;
+    }).join('');
+  }
+
+  // ---------- Enregistrement (DVR local) ----------
+  function openRecDB(){
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open('ts_recordings_db', 1);
+      req.onupgradeneeded = () => { req.result.createObjectStore('recordings', { keyPath: 'id' }); };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  async function addRecording(rec){
+    const db = await openRecDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('recordings', 'readwrite');
+      tx.objectStore('recordings').put(rec);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+  async function getAllRecordings(){
+    const db = await openRecDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('recordings', 'readonly');
+      const req = tx.objectStore('recordings').getAll();
+      req.onsuccess = () => resolve(req.result.sort((a,b) => b.date - a.date));
+      req.onerror = () => reject(req.error);
+    });
+  }
+  async function deleteRecording(id){
+    const db = await openRecDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('recordings', 'readwrite');
+      tx.objectStore('recordings').delete(id);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  function toggleRecording(){
+    if(mediaRecorder && mediaRecorder.state === 'recording'){ stopRecordingIfActive(false); return; }
+    const video = $('video');
+    let stream;
+    try{
+      stream = video.captureStream ? video.captureStream() : video.mozCaptureStream();
+    }catch(e){ alert("L'enregistrement n'est pas supporté sur ce navigateur/appareil."); return; }
+    if(!stream){ alert("L'enregistrement n'est pas supporté sur ce navigateur/appareil."); return; }
+
+    recChunks = [];
+    try{
+      mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+    }catch(e){
+      try{ mediaRecorder = new MediaRecorder(stream); }
+      catch(e2){ alert("L'enregistrement n'est pas supporté sur ce navigateur/appareil."); return; }
+    }
+    mediaRecorder.ondataavailable = (e) => { if(e.data && e.data.size) recChunks.push(e.data); };
+    mediaRecorder.onstop = async () => {
+      if(recChunks.length){
+        const blob = new Blob(recChunks, { type: 'video/webm' });
+        const rec = {
+          id: 'rec_' + Date.now(),
+          name: (currentChannel ? currentChannel.name : 'Enregistrement') + ' — ' + new Date().toLocaleString('fr-FR'),
+          date: Date.now(),
+          size: blob.size,
+          blob
+        };
+        await addRecording(rec);
+        if(currentTab === 'recordings') renderRecordingsTab();
+      }
+      recChunks = [];
+    };
+    mediaRecorder.start();
+    $('rec-btn').classList.add('recording');
+  }
+
+  function stopRecordingIfActive(silent){
+    if(mediaRecorder && mediaRecorder.state === 'recording'){
+      mediaRecorder.stop();
+    }
+    $('rec-btn').classList.remove('recording');
+  }
+
+  async function renderRecordingsTab(){
+    const list = await getAllRecordings();
+    $('rec-empty').style.display = list.length ? 'none' : 'block';
+    $('rec-list').innerHTML = list.map(r => `
+      <div class="rec-item">
+        <div class="ricon">🎬</div>
+        <div class="rinfo">
+          <div class="rname">${escapeHtml(r.name)}</div>
+          <div class="rmeta">${(r.size/1024/1024).toFixed(1)} Mo</div>
+        </div>
+        <div class="ractions">
+          <button onclick="playRecording('${r.id}')" title="Lire">▶</button>
+          <button onclick="downloadRecording('${r.id}')" title="Télécharger">⬇</button>
+          <button onclick="deleteRecordingUI('${r.id}')" title="Supprimer">✕</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  async function playRecording(id){
+    const list = await getAllRecordings();
+    const r = list.find(x => x.id === id);
+    if(!r) return;
+    currentChannel = null;
+    if(hls){ hls.destroy(); hls = null; }
+    const video = $('video');
+    clearCustomTracks(video);
+    $('player-title').textContent = r.name;
+    $('player-overlay').classList.add('open');
+    video.src = URL.createObjectURL(r.blob);
+    video.play();
+    renderSubsMenu(null);
+  }
+
+  async function downloadRecording(id){
+    const list = await getAllRecordings();
+    const r = list.find(x => x.id === id);
+    if(!r) return;
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(r.blob);
+    a.download = r.name.replace(/[^a-z0-9]+/gi,'_') + '.webm';
+    a.click();
+  }
+
+  async function deleteRecordingUI(id){
+    if(!confirm('Supprimer cet enregistrement ?')) return;
+    await deleteRecording(id);
+    renderRecordingsTab();
+  }
+
+  // ---------- Init ----------
+  renderSavedList();
+  rebuildChannelsFromSources();
+
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(()=>{}));
+  }
+</script>
+</body>
+</html>
