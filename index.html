@@ -277,9 +277,18 @@ position:fixed; inset:0; background:var(--bg); z-index:45; display:none; flex-di
 display:flex; align-items:center; gap:12px; padding:16px 16px 12px;
 border-bottom:1px solid var(--line); flex-shrink:0;
 }
-#plugins-top .close, #widget-top .close{
+#plugins-top .close, #widget-top .close, #widget-top .open-ext{
 background:var(--panel); border:1px solid var(--line); color:var(--text); width:36px; height:36px;
 border-radius:50%; font-size:15px; cursor:pointer; flex-shrink:0;
+}
+#widget-fallback{
+display:none; align-items:center; gap:10px; justify-content:center; flex-wrap:wrap;
+padding:12px 16px; background:var(--panel); border-bottom:1px solid var(--line); font-size:13px; color:var(--muted); flex-shrink:0;
+}
+#widget-fallback.show{ display:flex; }
+#widget-fallback button{
+background:var(--accent); color:#1a1305; border:none; padding:8px 16px; border-radius:8px;
+font-size:13px; font-weight:700; cursor:pointer; font-family:inherit;
 }
 #plugins-top .title, #widget-top .title{ font-size:16px; font-weight:600; flex:1; min-width:0;
 overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -388,6 +397,11 @@ Aucun enregistrement pour l'instant. Lance un enregistrement depuis le lecteur (
 <div id="widget-top">
 <button class="close" onclick="closeWidget()">✕</button>
 <div class="title" id="widget-title"></div>
+<button class="open-ext" onclick="openInBrowser()" title="Ouvrir dans le navigateur">↗</button>
+</div>
+<div id="widget-fallback">
+<span>Le site ne s'affiche pas ?</span>
+<button onclick="openInBrowser()">Ouvrir dans le navigateur ↗</button>
 </div>
 <iframe id="widget-frame" sandbox="allow-scripts allow-forms allow-same-origin allow-popups" referrerpolicy="no-referrer"></iframe>
 </div>
@@ -546,13 +560,25 @@ grid.innerHTML = list.map((p,i) => `
 </div>
 `).join('');
 }
+let currentWidgetUrl = '';
+let widgetFallbackTimer = null;
+function launchWidget(url, title){
+currentWidgetUrl = url;
+$('widget-title').textContent = title || url;
+$('widget-fallback').classList.remove('show');
+$('widget-frame').src = url;
+$('widget-overlay').classList.add('open');
+clearTimeout(widgetFallbackTimer);
+widgetFallbackTimer = setTimeout(() => { $('widget-fallback').classList.add('show'); }, 5000);
+}
+function openInBrowser(){
+if(currentWidgetUrl) window.open(currentWidgetUrl, '_blank', 'noopener');
+}
 function openWidget(i){
 const list = getPlugins().filter(p => p.type === 'widget');
 const p = list[i];
 if(!p) return;
-$('widget-title').textContent = p.name;
-$('widget-frame').src = p.url;
-$('widget-overlay').classList.add('open');
+launchWidget(p.url, p.name);
 }
 function normalizeUrl(raw){
 let url = raw.trim();
@@ -567,9 +593,7 @@ if(!url){ status.textContent = 'URL invalide.'; status.className = 'err'; return
 status.textContent = '';
 addToHistory(url);
 renderUrlHistory();
-$('widget-title').textContent = url;
-$('widget-frame').src = url;
-$('widget-overlay').classList.add('open');
+launchWidget(url, url);
 }
 // ---------- Historique des URLs ouvertes ----------
 function getUrlHistory(){
@@ -613,9 +637,7 @@ const h = getUrlHistory()[i];
 if(!h) return;
 addToHistory(h.url);
 renderUrlHistory();
-$('widget-title').textContent = h.url;
-$('widget-frame').src = h.url;
-$('widget-overlay').classList.add('open');
+launchWidget(h.url, h.url);
 }
 function favFromHistory(i){
 const h = getUrlHistory()[i];
@@ -643,6 +665,9 @@ renderPluginsOverlay();
 function closeWidget(){
 $('widget-overlay').classList.remove('open');
 $('widget-frame').src = 'about:blank';
+$('widget-fallback').classList.remove('show');
+clearTimeout(widgetFallbackTimer);
+currentWidgetUrl = '';
 }
 // ---------- M3U parsing ----------
 function parseM3U(text){
