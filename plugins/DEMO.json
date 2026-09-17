@@ -1,0 +1,6 @@
+{
+  "name": "Démo Widget",
+  "type": "widget",
+  "url": "https://www.wikipedia.org/",
+  "desc": "Exemple de plugin widget (mini-appli intégrée)"
+}
