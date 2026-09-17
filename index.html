@@ -371,8 +371,16 @@ Aucun enregistrement pour l'instant. Lance un enregistrement depuis le lecteur (
 <button onclick="saveQuickUrl()" style="background:var(--panel-hi); color:var(--text); border:1px solid var(--line);" title="Enregistrer pour plus tard">💾</button>
 </div>
 <div id="quick-url-status"></div>
+<div id="url-history-wrap" style="display:none;">
+<div style="display:flex; align-items:center; justify-content:space-between; margin:14px 0 4px;">
+<label style="margin:0;">Historique récent</label>
+<button onclick="clearUrlHistory()" style="background:none; border:none; color:var(--muted); font-size:11px; cursor:pointer; text-decoration:underline;">Vider</button>
+</div>
+<div class="saved-list" id="url-history-list" style="margin-top:0; border-top:none; padding-top:0;"></div>
+</div>
 <div style="margin:14px 0 18px; border-top:1px solid var(--line);"></div>
-<div id="plugins-empty">Aucun plugin visuel actif pour l'instant.<br>Ajoute-en un via le bouton "+" puis "Activer un plugin (code)".</div>
+<label>Favoris &amp; plugins actifs</label>
+<div id="plugins-empty">Aucun favori pour l'instant.<br>Ouvre une URL ci-dessus et appuie sur 💾, ou active un plugin via le code.</div>
 <div class="folder-grid" id="plugins-grid" style="display:none;"></div>
 </div>
 </div>
@@ -517,6 +525,7 @@ renderPluginsOverlay();
 }
 function openPluginsOverlay(){
 renderPluginsOverlay();
+renderUrlHistory();
 $('quick-url-input').value = '';
 $('quick-url-status').textContent = '';
 $('plugins-overlay').classList.add('open');
@@ -556,9 +565,67 @@ const url = normalizeUrl($('quick-url-input').value);
 const status = $('quick-url-status');
 if(!url){ status.textContent = 'URL invalide.'; status.className = 'err'; return; }
 status.textContent = '';
+addToHistory(url);
+renderUrlHistory();
 $('widget-title').textContent = url;
 $('widget-frame').src = url;
 $('widget-overlay').classList.add('open');
+}
+// ---------- Historique des URLs ouvertes ----------
+function getUrlHistory(){
+try { return JSON.parse(localStorage.getItem('ts_url_history')||'[]'); } catch(e){ return []; }
+}
+function saveUrlHistory(list){ localStorage.setItem('ts_url_history', JSON.stringify(list)); }
+function addToHistory(url){
+let list = getUrlHistory().filter(h => h.url !== url);
+list.unshift({ url, date: Date.now() });
+if(list.length > 20) list = list.slice(0, 20);
+saveUrlHistory(list);
+}
+function removeFromHistory(idx){
+const list = getUrlHistory();
+list.splice(idx, 1);
+saveUrlHistory(list);
+renderUrlHistory();
+}
+function clearUrlHistory(){
+if(!confirm("Vider tout l'historique des URLs ?")) return;
+saveUrlHistory([]);
+renderUrlHistory();
+}
+function renderUrlHistory(){
+const list = getUrlHistory();
+const wrap = $('url-history-wrap');
+const el = $('url-history-list');
+if(!wrap || !el) return;
+if(list.length === 0){ wrap.style.display = 'none'; el.innerHTML = ''; return; }
+wrap.style.display = 'block';
+el.innerHTML = list.map((h,i) => `
+<div class="saved-item">
+<span class="name" style="cursor:pointer; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" onclick="reopenHistory(${i})">${escapeHtml(h.url)}</span>
+<button class="del" onclick="favFromHistory(${i})" title="Ajouter aux favoris">⭐</button>
+<button class="del" onclick="removeFromHistory(${i})" title="Supprimer">✕</button>
+</div>
+`).join('');
+}
+function reopenHistory(i){
+const h = getUrlHistory()[i];
+if(!h) return;
+addToHistory(h.url);
+renderUrlHistory();
+$('widget-title').textContent = h.url;
+$('widget-frame').src = h.url;
+$('widget-overlay').classList.add('open');
+}
+function favFromHistory(i){
+const h = getUrlHistory()[i];
+if(!h) return;
+const name = prompt('Nom pour ce favori…', h.url.replace(/^https?:\/\//,'').split('/')[0]);
+if(!name) return;
+const list = getPlugins();
+list.push({ code: 'manual_' + Date.now(), name, type: 'widget', url: h.url, desc: "Ajouté depuis l'historique" });
+savePlugins(list);
+renderPluginsOverlay();
 }
 function saveQuickUrl(){
 const url = normalizeUrl($('quick-url-input').value);
