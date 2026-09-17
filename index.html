@@ -364,6 +364,14 @@ Aucun enregistrement pour l'instant. Lance un enregistrement depuis le lecteur (
 <div class="title">Mes plugins</div>
 </div>
 <div id="plugins-body">
+<label>Ouvrir une URL directement</label>
+<div class="plugin-code-row" style="margin-bottom:8px;">
+<input type="url" id="quick-url-input" placeholder="https://exemple.com" style="text-transform:none;">
+<button onclick="openUrlDirect()">Ouvrir</button>
+<button onclick="saveQuickUrl()" style="background:var(--panel-hi); color:var(--text); border:1px solid var(--line);" title="Enregistrer pour plus tard">💾</button>
+</div>
+<div id="quick-url-status"></div>
+<div style="margin:14px 0 18px; border-top:1px solid var(--line);"></div>
 <div id="plugins-empty">Aucun plugin visuel actif pour l'instant.<br>Ajoute-en un via le bouton "+" puis "Activer un plugin (code)".</div>
 <div class="folder-grid" id="plugins-grid" style="display:none;"></div>
 </div>
@@ -509,6 +517,8 @@ renderPluginsOverlay();
 }
 function openPluginsOverlay(){
 renderPluginsOverlay();
+$('quick-url-input').value = '';
+$('quick-url-status').textContent = '';
 $('plugins-overlay').classList.add('open');
 }
 function closePluginsOverlay(){ $('plugins-overlay').classList.remove('open'); }
@@ -534,6 +544,34 @@ if(!p) return;
 $('widget-title').textContent = p.name;
 $('widget-frame').src = p.url;
 $('widget-overlay').classList.add('open');
+}
+function normalizeUrl(raw){
+let url = raw.trim();
+if(!url) return '';
+if(!/^https?:\/\//i.test(url)) url = 'https://' + url;
+try{ new URL(url); return url; }catch(e){ return ''; }
+}
+function openUrlDirect(){
+const url = normalizeUrl($('quick-url-input').value);
+const status = $('quick-url-status');
+if(!url){ status.textContent = 'URL invalide.'; status.className = 'err'; return; }
+status.textContent = '';
+$('widget-title').textContent = url;
+$('widget-frame').src = url;
+$('widget-overlay').classList.add('open');
+}
+function saveQuickUrl(){
+const url = normalizeUrl($('quick-url-input').value);
+const status = $('quick-url-status');
+if(!url){ status.textContent = 'URL invalide.'; status.className = 'err'; return; }
+const name = prompt('Nom pour retrouver ce lien plus tard…', url.replace(/^https?:\/\//,'').split('/')[0]);
+if(!name) return;
+const list = getPlugins();
+list.push({ code: 'manual_' + Date.now(), name, type: 'widget', url, desc: 'Lien ajouté manuellement' });
+savePlugins(list);
+status.textContent = 'Enregistré dans "Mes plugins" !';
+status.className = 'ok';
+renderPluginsOverlay();
 }
 function closeWidget(){
 $('widget-overlay').classList.remove('open');
