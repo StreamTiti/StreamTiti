@@ -44,6 +44,10 @@ display:flex; align-items:center; gap:8px;
 }
 .wordmark .dot{ width:9px; height:9px; border-radius:50%; background:var(--accent); flex-shrink:0; }
 header .sub{ font-size:12px; color:var(--muted); margin-left:auto; }
+#plugins-btn{
+background:none; border:none; color:var(--muted); font-size:19px; cursor:pointer;
+padding:4px 2px; line-height:1; flex-shrink:0;
+}
 #search-bar{
 padding: 12px 18px; flex-shrink:0;
 display:flex; gap:8px;
@@ -252,6 +256,36 @@ position:absolute; inset:0; display:flex; align-items:center; justify-content:ce
 color:var(--muted); font-size:14px; pointer-events:none;
 }
 #player-status.err{ color:var(--error); flex-direction:column; gap:8px; text-align:center; padding:0 30px;}
+/* Plugins */
+.plugin-code-row{ display:flex; gap:8px; }
+.plugin-code-row input{
+flex:1; background:var(--panel-hi); border:1px solid var(--line); color:var(--text);
+padding:11px 13px; border-radius:9px; font-size:14px; font-family:inherit; text-transform:uppercase;
+}
+.plugin-code-row button{
+flex:0 0 auto; padding:0 18px; border-radius:9px; border:none; font-size:13px; font-weight:700;
+background:var(--accent); color:#1a1305; cursor:pointer; font-family:inherit;
+}
+#plugin-status{ font-size:12px; color:var(--muted); margin-top:8px; min-height:16px; }
+#plugin-status.err{ color:var(--error); }
+#plugin-status.ok{ color:var(--accent); }
+#plugins-overlay, #widget-overlay{
+position:fixed; inset:0; background:var(--bg); z-index:45; display:none; flex-direction:column;
+}
+#plugins-overlay.open, #widget-overlay.open{ display:flex; }
+#plugins-top, #widget-top{
+display:flex; align-items:center; gap:12px; padding:16px 16px 12px;
+border-bottom:1px solid var(--line); flex-shrink:0;
+}
+#plugins-top .close, #widget-top .close{
+background:var(--panel); border:1px solid var(--line); color:var(--text); width:36px; height:36px;
+border-radius:50%; font-size:15px; cursor:pointer; flex-shrink:0;
+}
+#plugins-top .title, #widget-top .title{ font-size:16px; font-weight:600; flex:1; min-width:0;
+overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#plugins-body{ flex:1; overflow-y:auto; padding:16px 18px; }
+#plugins-empty{ color:var(--muted); font-size:14px; text-align:center; padding:50px 24px; line-height:1.5; }
+#widget-frame{ flex:1; width:100%; border:none; background:#fff; }
 ::selection{ background:var(--accent); color:#1a1305; }
 </style>
 </head>
@@ -260,6 +294,7 @@ color:var(--muted); font-size:14px; pointer-events:none;
 <header>
 <div class="wordmark"><span class="dot"></span> streamTiti</div>
 <div class="sub" id="channel-count"></div>
+<button id="plugins-btn" onclick="openPluginsOverlay()" title="Mes plugins">🧩</button>
 </header>
 <div id="search-bar" style="display:none;">
 <input type="text" id="search-input" placeholder="Rechercher une chaîne…" oninput="renderGrid()">
@@ -314,7 +349,31 @@ Aucun enregistrement pour l'instant. Lance un enregistrement depuis le lecteur (
 <label>Sources gratuites suggérées</label>
 <div class="preset-list" id="preset-list"></div>
 <div class="saved-list" id="saved-list"></div>
+<label>Activer un plugin (code)</label>
+<div class="plugin-code-row">
+<input type="text" id="plugin-code-input" placeholder="Ex: DEMO" maxlength="24">
+<button onclick="activatePluginCode()">Activer</button>
 </div>
+<div id="plugin-status"></div>
+<div class="saved-list" id="plugin-list"></div>
+</div>
+</div>
+<div id="plugins-overlay">
+<div id="plugins-top">
+<button class="close" onclick="closePluginsOverlay()">✕</button>
+<div class="title">Mes plugins</div>
+</div>
+<div id="plugins-body">
+<div id="plugins-empty">Aucun plugin visuel actif pour l'instant.<br>Ajoute-en un via le bouton "+" puis "Activer un plugin (code)".</div>
+<div class="folder-grid" id="plugins-grid" style="display:none;"></div>
+</div>
+</div>
+<div id="widget-overlay">
+<div id="widget-top">
+<button class="close" onclick="closeWidget()">✕</button>
+<div class="title" id="widget-title"></div>
+</div>
+<iframe id="widget-frame" sandbox="allow-scripts allow-forms allow-same-origin allow-popups" referrerpolicy="no-referrer"></iframe>
 </div>
 <div id="player-overlay">
 <div id="player-top">
@@ -378,6 +437,108 @@ saveSources(list);
 renderSavedList();
 rebuildChannelsFromSources();
 }
+// ---------- Plugins (code -> manifest) ----------
+// Convention : chaque plugin est un fichier plugins/<CODE>.json dans le dépôt.
+// Format attendu : { "name": "...", "type": "playlist"|"widget", "url": "...", "desc": "..." (optionnel) }
+const PLUGIN_REGISTRY_BASE = 'https://raw.githubusercontent.com/StreamTiti/StreamTiti/main/plugins/';
+function getPlugins(){
+try { return JSON.parse(localStorage.getItem('ts_plugins')||'[]'); } catch(e){ return []; }
+}
+function savePlugins(list){ localStorage.setItem('ts_plugins', JSON.stringify(list)); }
+function setPluginStatus(msg, kind){
+const el = $('plugin-status');
+el.textContent = msg;
+el.className = kind ? kind : '';
+}
+async function activatePluginCode(){
+const raw = $('plugin-code-input').value.trim();
+if(!raw){ setPluginStatus('Entre un code d\'abord.', 'err'); return; }
+const code = raw.toUpperCase().replace(/[^A-Z0-9_-]/g,'');
+if(!code){ setPluginStatus('Code invalide.', 'err'); return; }
+if(getPlugins().some(p => p.code === code)){
+setPluginStatus('Ce plugin est déjà activé.', 'err');
+return;
+}
+setPluginStatus('Recherche du plugin…', '');
+let manifest = null;
+try{
+const res = await fetch(PLUGIN_REGISTRY_BASE + encodeURIComponent(code) + '.json', { cache:'no-store' });
+if(res.ok) manifest = await res.json();
+}catch(e){ /* réseau indisponible ou fichier absent */ }
+if(!manifest || !manifest.name || !manifest.type || !manifest.url){
+setPluginStatus('Code introuvable ou plugin invalide.', 'err');
+return;
+}
+if(manifest.type !== 'playlist' && manifest.type !== 'widget'){
+setPluginStatus('Type de plugin non supporté.', 'err');
+return;
+}
+const plugin = { code, name: manifest.name, type: manifest.type, url: manifest.url, desc: manifest.desc || '' };
+const list = getPlugins();
+list.push(plugin);
+savePlugins(list);
+if(plugin.type === 'playlist'){
+addSource({ name: '🧩 ' + plugin.name, type: 'url', content: plugin.url });
+await rebuildChannelsFromSources();
+}
+setPluginStatus('Plugin "' + plugin.name + '" activé !', 'ok');
+$('plugin-code-input').value = '';
+renderPluginList();
+}
+function renderPluginList(){
+const list = getPlugins();
+const el = $('plugin-list');
+if(!el) return;
+if(list.length === 0){ el.innerHTML = ''; return; }
+el.innerHTML = '<label>Plugins actifs</label>' + list.map((p,i) =>
+`<div class="saved-item"><span class="name">🧩 ${escapeHtml(p.name)}</span><button class="del" onclick="removePlugin(${i})">✕</button></div>`
+).join('');
+}
+function removePlugin(idx){
+const list = getPlugins();
+const removed = list.splice(idx,1)[0];
+savePlugins(list);
+if(removed && removed.type === 'playlist'){
+const sources = getSources();
+const sIdx = sources.findIndex(s => s.content === removed.url);
+if(sIdx > -1){ sources.splice(sIdx,1); saveSources(sources); rebuildChannelsFromSources(); }
+}
+renderSavedList();
+renderPluginList();
+renderPluginsOverlay();
+}
+function openPluginsOverlay(){
+renderPluginsOverlay();
+$('plugins-overlay').classList.add('open');
+}
+function closePluginsOverlay(){ $('plugins-overlay').classList.remove('open'); }
+function renderPluginsOverlay(){
+const list = getPlugins().filter(p => p.type === 'widget');
+const grid = $('plugins-grid');
+const empty = $('plugins-empty');
+if(list.length === 0){ grid.style.display = 'none'; empty.style.display = 'block'; return; }
+empty.style.display = 'none';
+grid.style.display = 'grid';
+grid.innerHTML = list.map((p,i) => `
+<div class="folder-tile" onclick="openWidget(${i})">
+<div class="flag">🧩</div>
+<div class="flabel">${escapeHtml(p.name)}</div>
+<div class="fcount">${escapeHtml(p.desc||'Toucher pour ouvrir')}</div>
+</div>
+`).join('');
+}
+function openWidget(i){
+const list = getPlugins().filter(p => p.type === 'widget');
+const p = list[i];
+if(!p) return;
+$('widget-title').textContent = p.name;
+$('widget-frame').src = p.url;
+$('widget-overlay').classList.add('open');
+}
+function closeWidget(){
+$('widget-overlay').classList.remove('open');
+$('widget-frame').src = 'about:blank';
+}
 // ---------- M3U parsing ----------
 function parseM3U(text){
 const lines = text.split(/\r?\n/);
@@ -424,7 +585,7 @@ renderGroups();
 renderGrid();
 }
 // ---------- Sheet ----------
-function openSheet(){ $('sheet-backdrop').classList.add('open'); renderSavedList(); renderPresetList(); }
+function openSheet(){ $('sheet-backdrop').classList.add('open'); renderSavedList(); renderPresetList(); renderPluginList(); setPluginStatus('',''); }
 function closeSheet(){ $('sheet-backdrop').classList.remove('open'); }
 function renderPresetList(){
 const sources = getSources();
