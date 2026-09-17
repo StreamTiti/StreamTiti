@@ -1,4 +1,4 @@
-const CACHE = 'streamtiti-v2';
+const CACHE = 'streamtiti-v3';
 const SHELL = ['./index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', (e) => {
@@ -14,9 +14,28 @@ self.addEventListener('activate', (e) => {
 });
 
 self.addEventListener('fetch', (e) => {
-  // Only cache same-origin app-shell requests; always go to network for streams/playlists.
   const url = new URL(e.request.url);
-  if (url.origin === self.location.origin && SHELL.some(s => url.pathname.endsWith(s.replace('./','')))) {
+  // Only touch same-origin app-shell requests; always go straight to network for streams/playlists.
+  if (url.origin !== self.location.origin) return;
+
+  const isHtml = e.request.mode === 'navigate' || url.pathname.endsWith('index.html');
+  if (isHtml) {
+    // Network-first : on va toujours chercher la dernière version en ligne.
+    // On ne retombe sur le cache que si le réseau est indisponible (mode hors-ligne).
+    e.respondWith(
+      fetch(e.request)
+        .then((res) => {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put(e.request, copy));
+          return res;
+        })
+        .catch(() => caches.match(e.request))
+    );
+    return;
+  }
+
+  if (SHELL.some(s => url.pathname.endsWith(s.replace('./','')))) {
+    // Cache-first pour les fichiers statiques qui changent rarement.
     e.respondWith(caches.match(e.request).then((cached) => cached || fetch(e.request)));
   }
 });
