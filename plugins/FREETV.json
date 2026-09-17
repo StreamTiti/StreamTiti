@@ -1,0 +1,6 @@
+{
+  "name": "Free-TV (exemple playlist)",
+  "type": "playlist",
+  "url": "https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8",
+  "desc": "Exemple de plugin playlist (ajoute des chaînes)"
+}
