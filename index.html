@@ -168,7 +168,7 @@ padding: 10px 20px 28px; border-top:1px solid var(--line);
 #sheet .handle{ width:36px; height:4px; background:var(--line); border-radius:2px; margin: 6px auto 18px; }
 #sheet h2{ font-size:18px; margin:0 0 14px; }
 #sheet label{ font-size:12px; color:var(--muted); display:block; margin: 14px 0 6px; }
-#sheet input[type=text], #sheet input[type=url]{
+#sheet input[type=text], #sheet input[type=url], #sheet input[type=password]{
 width:100%; background:var(--panel-hi); border:1px solid var(--line); color:var(--text);
 padding:11px 13px; border-radius:9px; font-size:14px; font-family:inherit;
 }
@@ -278,6 +278,9 @@ background:var(--accent); color:#1a1305; cursor:pointer; font-family:inherit;
 #plugin-status{ font-size:12px; color:var(--muted); margin-top:8px; min-height:16px; }
 #plugin-status.err{ color:var(--error); }
 #plugin-status.ok{ color:var(--accent); }
+#xtream-status{ font-size:12px; color:var(--muted); margin-top:6px; min-height:16px; }
+#xtream-status.err{ color:var(--error); }
+#xtream-status.ok{ color:var(--accent); }
 #plugins-overlay, #widget-overlay{
 position:fixed; inset:0; background:var(--bg); z-index:45; display:none; flex-direction:column;
 }
@@ -385,6 +388,14 @@ Aucun enregistrement pour l'instant. Lance un enregistrement depuis le lecteur (
 <label>Sources gratuites suggérées</label>
 <div class="preset-list" id="preset-list"></div>
 <div class="saved-list" id="saved-list"></div>
+<label>Ajouter un compte Xtream Codes</label>
+<input type="text" id="xtream-host" placeholder="Adresse du serveur (ex: http://serveur.com:8080)">
+<div class="plugin-code-row" style="margin-top:8px;">
+<input type="text" id="xtream-user" placeholder="Utilisateur">
+<input type="password" id="xtream-pass" placeholder="Mot de passe">
+</div>
+<button class="btn primary" style="width:100%; margin-top:8px; padding:11px; border-radius:9px;" onclick="addXtreamSource()">Ajouter ce compte</button>
+<div id="xtream-status"></div>
 <label>Activer un plugin (code)</label>
 <div class="plugin-code-row">
 <input type="text" id="plugin-code-input" placeholder="Ex: DEMO" maxlength="24">
@@ -521,6 +532,33 @@ list.splice(idx,1);
 saveSources(list);
 renderSavedList();
 rebuildChannelsFromSources();
+}
+async function addXtreamSource(){
+const hostRaw = $('xtream-host').value.trim();
+const user = $('xtream-user').value.trim();
+const pass = $('xtream-pass').value.trim();
+const status = $('xtream-status');
+if(!hostRaw || !user || !pass){ status.textContent = 'Remplis les 3 champs.'; status.className = 'err'; return; }
+let host = hostRaw.replace(/\/+$/,'');
+if(!/^https?:\/\//i.test(host)) host = 'http://' + host;
+const url = `${host}/get.php?username=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}&type=m3u_plus&output=ts`;
+status.textContent = 'Connexion au serveur…';
+status.className = '';
+try{
+const res = await fetch(url, { cache:'no-store' });
+if(!res.ok){ status.textContent = `Le serveur a répondu une erreur (${res.status}). Vérifie l'adresse et les identifiants.`; status.className = 'err'; return; }
+}catch(e){
+status.textContent = "Connexion impossible : soit les identifiants sont faux, soit le serveur bloque les requêtes depuis un navigateur (CORS), soit c'est un lien http:// non autorisé depuis cette app en https.";
+status.className = 'err';
+return;
+}
+addSource({ name: `Xtream : ${user}@${host.replace(/^https?:\/\//,'')}`, type: 'url', content: url });
+await rebuildChannelsFromSources();
+status.textContent = 'Compte ajouté !';
+status.className = 'ok';
+$('xtream-host').value = '';
+$('xtream-user').value = '';
+$('xtream-pass').value = '';
 }
 // ---------- Plugins (code -> manifest) ----------
 // Convention : chaque plugin est un fichier plugins/<CODE>.json dans le dépôt.
